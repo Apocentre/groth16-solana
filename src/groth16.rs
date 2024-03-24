@@ -121,10 +121,7 @@ impl Groth16Verifier<'_> {
       .concat();
 
       let pairing_res = alt_bn128_pairing(pairing_input.as_slice())
-          .map_err(|error| {
-            msg!("1 >>>>>>> Here {:?}", error);
-            Groth16Error::ProofVerificationFailed
-          })?;
+          .map_err(|_|Groth16Error::ProofVerificationFailed)?;
 
       if pairing_res[31] != 1 {
           msg!("2 >>>>>>> {:?}", pairing_res[31]);
