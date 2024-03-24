@@ -46,7 +46,6 @@ pub struct Groth16PublicInputProcessor<'a, const NR_INPUTS: usize> {
   public_inputs: &'a [[u8; 32]; NR_INPUTS],
   prepared_public_inputs: [u8; 64],
   verifyingkey: &'a Groth16Verifyingkey<'a>,
-  // This indicates the batches that have been already executed
   offset: usize,
 }
 
@@ -56,7 +55,7 @@ pub struct Groth16PublicInputProcessor<'a, const NR_INPUTS: usize> {
 pub fn prepare_inputs(
   verifyingkey: &Groth16Verifyingkey,
   prepared_public_inputs: Option<[u8; 64]>,
-  public_inputs: &[[u8; 32]],
+  public_inputs: Vec<[u8; 32]>,
   offset: usize,
 ) -> Result<[u8; 64], Groth16Error> {
   let mut prepared_public_inputs = prepared_public_inputs.unwrap_or(verifyingkey.vk_ic[0]);
