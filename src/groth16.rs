@@ -41,14 +41,6 @@ pub struct Groth16Verifyingkey<'a> {
   pub vk_ic: &'a [[u8; 64]],
 }
 
-#[derive(PartialEq, Eq, Debug)]
-pub struct Groth16PublicInputProcessor<'a, const NR_INPUTS: usize> {
-  public_inputs: &'a [[u8; 32]; NR_INPUTS],
-  prepared_public_inputs: [u8; 64],
-  verifyingkey: &'a Groth16Verifyingkey<'a>,
-  offset: usize,
-}
-
 /// This function is called in batches. Because of heap limit of the Solana runtime, 
 /// we split the pub_input processing accross multiple instruction. In each in we pass
 /// the current `prepared_public_inputs` value and return the new one.
@@ -78,7 +70,7 @@ pub fn prepare_inputs(
 }
 
 #[derive(PartialEq, Eq, Debug)]
-pub struct Groth16Verifier<'a, const NR_INPUTS: usize> {
+pub struct Groth16Verifier<'a> {
   proof_a: &'a [u8; 64],
   proof_b: &'a [u8; 128],
   proof_c: &'a [u8; 64],
@@ -86,14 +78,14 @@ pub struct Groth16Verifier<'a, const NR_INPUTS: usize> {
   verifyingkey: &'a Groth16Verifyingkey<'a>,
 }
 
-impl<const NR_INPUTS: usize> Groth16Verifier<'_, NR_INPUTS> {
+impl Groth16Verifier<'_> {
   pub fn new<'a>(
       proof_a: &'a [u8; 64],
       proof_b: &'a [u8; 128],
       proof_c: &'a [u8; 64],
       prepared_public_inputs: [u8; 64],
       verifyingkey: &'a Groth16Verifyingkey<'a>,
-  ) -> Result<Groth16Verifier<'a, NR_INPUTS>, Groth16Error> {
+  ) -> Result<Groth16Verifier<'a>, Groth16Error> {
       if proof_a.len() != 64 {
           return Err(Groth16Error::InvalidG1Length);
       }
