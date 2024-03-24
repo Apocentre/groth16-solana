@@ -42,16 +42,49 @@ pub struct Groth16Verifyingkey<'a> {
 }
 
 #[derive(PartialEq, Eq, Debug)]
-pub struct Groth16Verifier<'a, const NR_INPUTS: usize> {
-  proof_a: &'a [u8; 64],
-  proof_b: &'a [u8; 128],
-  proof_c: &'a [u8; 64],
+pub struct Groth16PublicInputProcessor<'a, const NR_INPUTS: usize> {
   public_inputs: &'a [[u8; 32]; NR_INPUTS],
   prepared_public_inputs: [u8; 64],
   verifyingkey: &'a Groth16Verifyingkey<'a>,
   // This indicates the batches that have been already executed
   offset: usize,
+}
 
+/// This function is called in batches. Because of heap limit of the Solana runtime, 
+/// we split the pub_input processing accross multiple instruction. In each in we pass
+/// the current `prepared_public_inputs` value and return the new one.
+pub fn prepare_inputs(
+  verifyingkey: &Groth16Verifyingkey,
+  prepared_public_inputs: Option<[u8; 64]>,
+  public_inputs: &[[u8; 32]],
+  offset: usize,
+) -> Result<[u8; 64], Groth16Error> {
+  let mut prepared_public_inputs = prepared_public_inputs.unwrap_or(verifyingkey.vk_ic[0]);
+
+  for (i, input) in public_inputs.iter().enumerate() {
+      // Make sure we use the correct verifyingkey section
+      let v_key_idx = offset + i;
+      let mul_res = alt_bn128_multiplication(
+          &[&verifyingkey.vk_ic[v_key_idx + 1][..], &input[..]].concat(),
+      )
+      .map_err(|_| Groth16Error::PreparingInputsG1MulFailed)?;
+      prepared_public_inputs =
+          alt_bn128_addition(&[&mul_res[..], &prepared_public_inputs[..]].concat())
+              .map_err(|_| Groth16Error::PreparingInputsG1AdditionFailed)?[..]
+              .try_into()
+              .map_err(|_| Groth16Error::PreparingInputsG1AdditionFailed)?;
+  }
+
+  Ok(prepared_public_inputs)
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub struct Groth16Verifier<'a, const NR_INPUTS: usize> {
+  proof_a: &'a [u8; 64],
+  proof_b: &'a [u8; 128],
+  proof_c: &'a [u8; 64],
+  prepared_public_inputs: [u8; 64],
+  verifyingkey: &'a Groth16Verifyingkey<'a>,
 }
 
 impl<const NR_INPUTS: usize> Groth16Verifier<'_, NR_INPUTS> {
@@ -59,11 +92,8 @@ impl<const NR_INPUTS: usize> Groth16Verifier<'_, NR_INPUTS> {
       proof_a: &'a [u8; 64],
       proof_b: &'a [u8; 128],
       proof_c: &'a [u8; 64],
-      public_inputs: &'a [[u8; 32]; NR_INPUTS],
-      verifyingkey: &'a Groth16Verifyingkey<'a>,
       prepared_public_inputs: [u8; 64],
-      offset: usize,
-
+      verifyingkey: &'a Groth16Verifyingkey<'a>,
   ) -> Result<Groth16Verifier<'a, NR_INPUTS>, Groth16Error> {
       if proof_a.len() != 64 {
           return Err(Groth16Error::InvalidG1Length);
@@ -85,42 +115,12 @@ impl<const NR_INPUTS: usize> Groth16Verifier<'_, NR_INPUTS> {
           proof_a,
           proof_b,
           proof_c,
-          public_inputs,
-          verifyingkey,
           prepared_public_inputs,
-          offset,
+          verifyingkey,
       })
   }
 
-  /// This function is called in batches. Because of heap limit of the Solana runtime, 
-  /// we split the pub_input processing accross multiple instruction. In each in we pass
-  /// the current `prepared_public_inputs` value and return the new one.
-  pub fn prepare_inputs(&mut self) -> Result<[u8; 64], Groth16Error> {
-      let mut prepared_public_inputs = self.verifyingkey.vk_ic[0];
-
-      for (i, input) in self.public_inputs.iter().enumerate() {
-          // Make sure we use the correct verifyingkey section
-          let v_key_idx = self.offset + i;
-          let mul_res = alt_bn128_multiplication(
-              &[&self.verifyingkey.vk_ic[v_key_idx + 1][..], &input[..]].concat(),
-          )
-          .map_err(|_| Groth16Error::PreparingInputsG1MulFailed)?;
-          prepared_public_inputs =
-              alt_bn128_addition(&[&mul_res[..], &prepared_public_inputs[..]].concat())
-                  .map_err(|_| Groth16Error::PreparingInputsG1AdditionFailed)?[..]
-                  .try_into()
-                  .map_err(|_| Groth16Error::PreparingInputsG1AdditionFailed)?;
-      }
-
-      self.offset += self.public_inputs.len();
-      self.prepared_public_inputs = prepared_public_inputs;
-
-      Ok(self.prepared_public_inputs)
-  }
-
   pub fn verify(&mut self) -> Result<bool, Groth16Error> {
-      self.prepare_inputs()?;
-
       let pairing_input = [
           self.proof_a.as_slice(),
           self.proof_b.as_slice(),
