@@ -25,9 +25,9 @@
 //!
 //! See functional test for a running example how to use this library.
 //!
-use solana_program::{alt_bn128::prelude::{
+use solana_program::alt_bn128::prelude::{
   alt_bn128_addition, alt_bn128_multiplication, alt_bn128_pairing,
-}, msg};
+};
 
 use crate::errors::Groth16Error;
 
@@ -124,7 +124,6 @@ impl Groth16Verifier<'_> {
           .map_err(|_|Groth16Error::ProofVerificationFailed)?;
 
       if pairing_res[31] != 1 {
-          msg!("2 >>>>>>> {:?}", pairing_res[31]);
           return Err(Groth16Error::ProofVerificationFailed);
       }
       Ok(true)
