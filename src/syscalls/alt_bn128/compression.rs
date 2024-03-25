@@ -3,494 +3,488 @@
 use thiserror::Error;
 
 pub mod alt_bn128_compression_size {
-    pub const G1: usize = 64;
-    pub const G2: usize = 128;
-    pub const G1_COMPRESSED: usize = 32;
-    pub const G2_COMPRESSED: usize = 64;
+  pub const G1: usize = 64;
+  pub const G2: usize = 128;
+  pub const G1_COMPRESSED: usize = 32;
+  pub const G2_COMPRESSED: usize = 64;
 }
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum AltBn128CompressionError {
-    #[error("Unexpected error")]
-    UnexpectedError,
-    #[error("Failed to decompress g1")]
-    G1DecompressionFailed,
-    #[error("Failed to decompress g2")]
-    G2DecompressionFailed,
-    #[error("Failed to compress affine g1")]
-    G1CompressionFailed,
-    #[error("Failed to compress affine g2")]
-    G2CompressionFailed,
-    #[error("Invalid input size")]
-    InvalidInputSize,
+  #[error("Unexpected error")]
+  UnexpectedError,
+  #[error("Failed to decompress g1")]
+  G1DecompressionFailed,
+  #[error("Failed to decompress g2")]
+  G2DecompressionFailed,
+  #[error("Failed to compress affine g1")]
+  G1CompressionFailed,
+  #[error("Failed to compress affine g2")]
+  G2CompressionFailed,
+  #[error("Invalid input size")]
+  InvalidInputSize,
 }
 
 impl From<u64> for AltBn128CompressionError {
-    fn from(v: u64) -> AltBn128CompressionError {
-        match v {
-            1 => AltBn128CompressionError::G1DecompressionFailed,
-            2 => AltBn128CompressionError::G2DecompressionFailed,
-            3 => AltBn128CompressionError::G1CompressionFailed,
-            4 => AltBn128CompressionError::G2CompressionFailed,
-            5 => AltBn128CompressionError::InvalidInputSize,
-            _ => AltBn128CompressionError::UnexpectedError,
-        }
+  fn from(v: u64) -> AltBn128CompressionError {
+    match v {
+      1 => AltBn128CompressionError::G1DecompressionFailed,
+      2 => AltBn128CompressionError::G2DecompressionFailed,
+      3 => AltBn128CompressionError::G1CompressionFailed,
+      4 => AltBn128CompressionError::G2CompressionFailed,
+      5 => AltBn128CompressionError::InvalidInputSize,
+      _ => AltBn128CompressionError::UnexpectedError,
     }
+  }
 }
 
 impl From<AltBn128CompressionError> for u64 {
-    fn from(v: AltBn128CompressionError) -> u64 {
-        match v {
-            AltBn128CompressionError::G1DecompressionFailed => 1,
-            AltBn128CompressionError::G2DecompressionFailed => 2,
-            AltBn128CompressionError::G1CompressionFailed => 3,
-            AltBn128CompressionError::G2CompressionFailed => 4,
-            AltBn128CompressionError::InvalidInputSize => 5,
-            AltBn128CompressionError::UnexpectedError => 0,
-        }
+  fn from(v: AltBn128CompressionError) -> u64 {
+    match v {
+      AltBn128CompressionError::G1DecompressionFailed => 1,
+      AltBn128CompressionError::G2DecompressionFailed => 2,
+      AltBn128CompressionError::G1CompressionFailed => 3,
+      AltBn128CompressionError::G2CompressionFailed => 4,
+      AltBn128CompressionError::InvalidInputSize => 5,
+      AltBn128CompressionError::UnexpectedError => 0,
     }
+  }
 }
 
 #[cfg(not(target_os = "solana"))]
 pub mod target_arch {
 
-    use {
-        super::*,
-        alt_bn128_compression_size,
-        ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate},
-    };
+  use {
+    super::*,
+    alt_bn128_compression_size,
+    ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate},
+  };
 
-    type G1 = ark_bn254::g1::G1Affine;
-    type G2 = ark_bn254::g2::G2Affine;
+  type G1 = ark_bn254::g1::G1Affine;
+  type G2 = ark_bn254::g2::G2Affine;
 
-    pub fn alt_bn128_g1_decompress(
-        g1_bytes: &[u8],
-    ) -> Result<[u8; alt_bn128_compression_size::G1], AltBn128CompressionError> {
-        let g1_bytes: [u8; alt_bn128_compression_size::G1_COMPRESSED] = g1_bytes
-            .try_into()
-            .map_err(|_| AltBn128CompressionError::InvalidInputSize)?;
-        if g1_bytes == [0u8; alt_bn128_compression_size::G1_COMPRESSED] {
-            return Ok([0u8; alt_bn128_compression_size::G1]);
-        }
-        let decompressed_g1 = G1::deserialize_with_mode(
-            convert_endianness::<32, 32>(&g1_bytes).as_slice(),
-            Compress::Yes,
-            Validate::No,
-        )
-        .map_err(|_| AltBn128CompressionError::G1DecompressionFailed)?;
+  pub fn alt_bn128_g1_decompress(
+    g1_bytes: &[u8],
+  ) -> Result<[u8; alt_bn128_compression_size::G1], AltBn128CompressionError> {
+    let g1_bytes: [u8; alt_bn128_compression_size::G1_COMPRESSED] = g1_bytes
+      .try_into()
+      .map_err(|_| AltBn128CompressionError::InvalidInputSize)?;
+    if g1_bytes == [0u8; alt_bn128_compression_size::G1_COMPRESSED] {
+      return Ok([0u8; alt_bn128_compression_size::G1]);
+    }
+    let decompressed_g1 = G1::deserialize_with_mode(
+      convert_endianness::<32, 32>(&g1_bytes).as_slice(),
+      Compress::Yes,
+      Validate::No,
+    )
+    .map_err(|_| AltBn128CompressionError::G1DecompressionFailed)?;
 
-        let mut decompressed_g1_bytes = [0u8; alt_bn128_compression_size::G1];
-        decompressed_g1
-            .x
-            .serialize_with_mode(&mut decompressed_g1_bytes[..32], Compress::No)
-            .map_err(|_| AltBn128CompressionError::G1DecompressionFailed)?;
-        decompressed_g1
-            .y
-            .serialize_with_mode(&mut decompressed_g1_bytes[32..], Compress::No)
-            .map_err(|_| AltBn128CompressionError::G1DecompressionFailed)?;
-        Ok(convert_endianness::<32, 64>(&decompressed_g1_bytes))
+    let mut decompressed_g1_bytes = [0u8; alt_bn128_compression_size::G1];
+    decompressed_g1
+      .x
+      .serialize_with_mode(&mut decompressed_g1_bytes[..32], Compress::No)
+      .map_err(|_| AltBn128CompressionError::G1DecompressionFailed)?;
+    decompressed_g1
+      .y
+      .serialize_with_mode(&mut decompressed_g1_bytes[32..], Compress::No)
+      .map_err(|_| AltBn128CompressionError::G1DecompressionFailed)?;
+    Ok(convert_endianness::<32, 64>(&decompressed_g1_bytes))
+  }
+
+  pub fn alt_bn128_g1_compress(
+    g1_bytes: &[u8],
+  ) -> Result<[u8; alt_bn128_compression_size::G1_COMPRESSED], AltBn128CompressionError> {
+    let g1_bytes: [u8; alt_bn128_compression_size::G1] = g1_bytes
+      .try_into()
+      .map_err(|_| AltBn128CompressionError::InvalidInputSize)?;
+    if g1_bytes == [0u8; alt_bn128_compression_size::G1] {
+      return Ok([0u8; alt_bn128_compression_size::G1_COMPRESSED]);
+    }
+    let g1 = G1::deserialize_with_mode(
+      convert_endianness::<32, 64>(&g1_bytes).as_slice(),
+      Compress::No,
+      Validate::No,
+    )
+    .map_err(|_| AltBn128CompressionError::G1CompressionFailed)?;
+    let mut g1_bytes = [0u8; alt_bn128_compression_size::G1_COMPRESSED];
+    G1::serialize_compressed(&g1, g1_bytes.as_mut_slice())
+      .map_err(|_| AltBn128CompressionError::G2CompressionFailed)?;
+    Ok(convert_endianness::<32, 32>(&g1_bytes))
+  }
+
+  pub fn alt_bn128_g2_decompress(
+    g2_bytes: &[u8],
+  ) -> Result<[u8; alt_bn128_compression_size::G2], AltBn128CompressionError> {
+    let g2_bytes: [u8; alt_bn128_compression_size::G2_COMPRESSED] = g2_bytes
+      .try_into()
+      .map_err(|_| AltBn128CompressionError::InvalidInputSize)?;
+    if g2_bytes == [0u8; alt_bn128_compression_size::G2_COMPRESSED] {
+      return Ok([0u8; alt_bn128_compression_size::G2]);
     }
 
-    pub fn alt_bn128_g1_compress(
-        g1_bytes: &[u8],
-    ) -> Result<[u8; alt_bn128_compression_size::G1_COMPRESSED], AltBn128CompressionError> {
-        let g1_bytes: [u8; alt_bn128_compression_size::G1] = g1_bytes
-            .try_into()
-            .map_err(|_| AltBn128CompressionError::InvalidInputSize)?;
-        if g1_bytes == [0u8; alt_bn128_compression_size::G1] {
-            return Ok([0u8; alt_bn128_compression_size::G1_COMPRESSED]);
-        }
-        let g1 = G1::deserialize_with_mode(
-            convert_endianness::<32, 64>(&g1_bytes).as_slice(),
-            Compress::No,
-            Validate::No,
-        )
-        .map_err(|_| AltBn128CompressionError::G1CompressionFailed)?;
-        let mut g1_bytes = [0u8; alt_bn128_compression_size::G1_COMPRESSED];
-        G1::serialize_compressed(&g1, g1_bytes.as_mut_slice())
-            .map_err(|_| AltBn128CompressionError::G2CompressionFailed)?;
-        Ok(convert_endianness::<32, 32>(&g1_bytes))
-    }
-
-    pub fn alt_bn128_g2_decompress(
-        g2_bytes: &[u8],
-    ) -> Result<[u8; alt_bn128_compression_size::G2], AltBn128CompressionError> {
-        let g2_bytes: [u8; alt_bn128_compression_size::G2_COMPRESSED] = g2_bytes
-            .try_into()
-            .map_err(|_| AltBn128CompressionError::InvalidInputSize)?;
-        if g2_bytes == [0u8; alt_bn128_compression_size::G2_COMPRESSED] {
-            return Ok([0u8; alt_bn128_compression_size::G2]);
-        }
-
-        let decompressed_g2 =
-            G2::deserialize_compressed(convert_endianness::<64, 64>(&g2_bytes).as_slice())
-                .map_err(|_| AltBn128CompressionError::G2DecompressionFailed)?;
-
-        let mut decompressed_g2_bytes = [0u8; alt_bn128_compression_size::G2];
-        decompressed_g2
-            .x
-            .serialize_with_mode(&mut decompressed_g2_bytes[..64], Compress::No)
-            .map_err(|_| AltBn128CompressionError::G2DecompressionFailed)?;
-
-        decompressed_g2
-            .y
-            .serialize_with_mode(&mut decompressed_g2_bytes[64..128], Compress::No)
-            .map_err(|_| AltBn128CompressionError::G2DecompressionFailed)?;
-        Ok(convert_endianness::<64, 128>(&decompressed_g2_bytes))
-    }
-
-    pub fn alt_bn128_g2_compress(
-        g2_bytes: &[u8],
-    ) -> Result<[u8; alt_bn128_compression_size::G2_COMPRESSED], AltBn128CompressionError> {
-        let g2_bytes: [u8; alt_bn128_compression_size::G2] = g2_bytes
-            .try_into()
-            .map_err(|_| AltBn128CompressionError::InvalidInputSize)?;
-        if g2_bytes == [0u8; alt_bn128_compression_size::G2] {
-            return Ok([0u8; alt_bn128_compression_size::G2_COMPRESSED]);
-        }
-        let g2 = G2::deserialize_with_mode(
-            convert_endianness::<64, 128>(&g2_bytes).as_slice(),
-            Compress::No,
-            Validate::No,
-        )
+    let decompressed_g2 =
+      G2::deserialize_compressed(convert_endianness::<64, 64>(&g2_bytes).as_slice())
         .map_err(|_| AltBn128CompressionError::G2DecompressionFailed)?;
-        let mut g2_bytes = [0u8; alt_bn128_compression_size::G2_COMPRESSED];
-        G2::serialize_compressed(&g2, g2_bytes.as_mut_slice())
-            .map_err(|_| AltBn128CompressionError::G2CompressionFailed)?;
-        Ok(convert_endianness::<64, 64>(&g2_bytes))
-    }
 
-    pub fn convert_endianness<const CHUNK_SIZE: usize, const ARRAY_SIZE: usize>(
-        bytes: &[u8; ARRAY_SIZE],
-    ) -> [u8; ARRAY_SIZE] {
-        let reversed: [_; ARRAY_SIZE] = bytes
-            .chunks_exact(CHUNK_SIZE)
-            .flat_map(|chunk| chunk.iter().rev().copied())
-            .enumerate()
-            .fold([0u8; ARRAY_SIZE], |mut acc, (i, v)| {
-                acc[i] = v;
-                acc
-            });
-        reversed
+    let mut decompressed_g2_bytes = [0u8; alt_bn128_compression_size::G2];
+    decompressed_g2
+      .x
+      .serialize_with_mode(&mut decompressed_g2_bytes[..64], Compress::No)
+      .map_err(|_| AltBn128CompressionError::G2DecompressionFailed)?;
+
+    decompressed_g2
+      .y
+      .serialize_with_mode(&mut decompressed_g2_bytes[64..128], Compress::No)
+      .map_err(|_| AltBn128CompressionError::G2DecompressionFailed)?;
+    Ok(convert_endianness::<64, 128>(&decompressed_g2_bytes))
+  }
+
+  pub fn alt_bn128_g2_compress(
+    g2_bytes: &[u8],
+  ) -> Result<[u8; alt_bn128_compression_size::G2_COMPRESSED], AltBn128CompressionError> {
+    let g2_bytes: [u8; alt_bn128_compression_size::G2] = g2_bytes
+      .try_into()
+      .map_err(|_| AltBn128CompressionError::InvalidInputSize)?;
+    if g2_bytes == [0u8; alt_bn128_compression_size::G2] {
+      return Ok([0u8; alt_bn128_compression_size::G2_COMPRESSED]);
     }
+    let g2 = G2::deserialize_with_mode(
+      convert_endianness::<64, 128>(&g2_bytes).as_slice(),
+      Compress::No,
+      Validate::No,
+    )
+    .map_err(|_| AltBn128CompressionError::G2DecompressionFailed)?;
+    let mut g2_bytes = [0u8; alt_bn128_compression_size::G2_COMPRESSED];
+    G2::serialize_compressed(&g2, g2_bytes.as_mut_slice())
+      .map_err(|_| AltBn128CompressionError::G2CompressionFailed)?;
+    Ok(convert_endianness::<64, 64>(&g2_bytes))
+  }
+
+  pub fn convert_endianness<const CHUNK_SIZE: usize, const ARRAY_SIZE: usize>(
+    bytes: &[u8; ARRAY_SIZE],
+  ) -> [u8; ARRAY_SIZE] {
+    let reversed: [_; ARRAY_SIZE] = bytes
+      .chunks_exact(CHUNK_SIZE)
+      .flat_map(|chunk| chunk.iter().rev().copied())
+      .enumerate()
+      .fold([0u8; ARRAY_SIZE], |mut acc, (i, v)| {
+        acc[i] = v;
+        acc
+      });
+    reversed
+  }
 }
 
 #[cfg(target_os = "solana")]
 pub mod target_arch {
-    use {
-        super::*,
-        alt_bn128_compression_size::{G1, G1_COMPRESSED, G2, G2_COMPRESSED},
+  use {
+    super::*,
+    alt_bn128_compression_size::{G1, G1_COMPRESSED, G2, G2_COMPRESSED},
+  };
+  pub const ALT_BN128_G1_COMPRESS: u64 = 0;
+  pub const ALT_BN128_G1_DECOMPRESS: u64 = 1;
+  pub const ALT_BN128_G2_COMPRESS: u64 = 2;
+  pub const ALT_BN128_G2_DECOMPRESS: u64 = 3;
+  pub fn alt_bn128_g1_compress(
+    input: &[u8],
+  ) -> Result<[u8; G1_COMPRESSED], AltBn128CompressionError> {
+    let mut result_buffer = [0; G1_COMPRESSED];
+    let result = unsafe {
+      crate::syscalls::sol_alt_bn128_compression(
+        ALT_BN128_G1_COMPRESS,
+        input as *const _ as *const u8,
+        input.len() as u64,
+        &mut result_buffer as *mut _ as *mut u8,
+      )
     };
-    pub const ALT_BN128_G1_COMPRESS: u64 = 0;
-    pub const ALT_BN128_G1_DECOMPRESS: u64 = 1;
-    pub const ALT_BN128_G2_COMPRESS: u64 = 2;
-    pub const ALT_BN128_G2_DECOMPRESS: u64 = 3;
-    pub fn alt_bn128_g1_compress(
-        input: &[u8],
-    ) -> Result<[u8; G1_COMPRESSED], AltBn128CompressionError> {
-        let mut result_buffer = [0; G1_COMPRESSED];
-        let result = unsafe {
-            crate::syscalls::sol_alt_bn128_compression(
-                ALT_BN128_G1_COMPRESS,
-                input as *const _ as *const u8,
-                input.len() as u64,
-                &mut result_buffer as *mut _ as *mut u8,
-            )
-        };
 
-        match result {
-            0 => Ok(result_buffer),
-            error => Err(AltBn128CompressionError::from(error)),
-        }
+    match result {
+      0 => Ok(result_buffer),
+      error => Err(AltBn128CompressionError::from(error)),
     }
+  }
 
-    pub fn alt_bn128_g1_decompress(input: &[u8]) -> Result<[u8; G1], AltBn128CompressionError> {
-        let mut result_buffer = [0; G1];
-        let result = unsafe {
-            crate::syscalls::sol_alt_bn128_compression(
-                ALT_BN128_G1_DECOMPRESS,
-                input as *const _ as *const u8,
-                input.len() as u64,
-                &mut result_buffer as *mut _ as *mut u8,
-            )
-        };
+  pub fn alt_bn128_g1_decompress(input: &[u8]) -> Result<[u8; G1], AltBn128CompressionError> {
+    let mut result_buffer = [0; G1];
+    let result = unsafe {
+      crate::syscalls::sol_alt_bn128_compression(
+        ALT_BN128_G1_DECOMPRESS,
+        input as *const _ as *const u8,
+        input.len() as u64,
+        &mut result_buffer as *mut _ as *mut u8,
+      )
+    };
 
-        match result {
-            0 => Ok(result_buffer),
-            error => Err(AltBn128CompressionError::from(error)),
-        }
+    match result {
+      0 => Ok(result_buffer),
+      error => Err(AltBn128CompressionError::from(error)),
     }
+  }
 
-    pub fn alt_bn128_g2_compress(
-        input: &[u8],
-    ) -> Result<[u8; G2_COMPRESSED], AltBn128CompressionError> {
-        let mut result_buffer = [0; G2_COMPRESSED];
-        let result = unsafe {
-            crate::syscalls::sol_alt_bn128_compression(
-                ALT_BN128_G2_COMPRESS,
-                input as *const _ as *const u8,
-                input.len() as u64,
-                &mut result_buffer as *mut _ as *mut u8,
-            )
-        };
+  pub fn alt_bn128_g2_compress(
+    input: &[u8],
+  ) -> Result<[u8; G2_COMPRESSED], AltBn128CompressionError> {
+    let mut result_buffer = [0; G2_COMPRESSED];
+    let result = unsafe {
+      crate::syscalls::sol_alt_bn128_compression(
+        ALT_BN128_G2_COMPRESS,
+        input as *const _ as *const u8,
+        input.len() as u64,
+        &mut result_buffer as *mut _ as *mut u8,
+      )
+    };
 
-        match result {
-            0 => Ok(result_buffer),
-            error => Err(AltBn128CompressionError::from(error)),
-        }
+    match result {
+      0 => Ok(result_buffer),
+      error => Err(AltBn128CompressionError::from(error)),
     }
+  }
 
-    pub fn alt_bn128_g2_decompress(
-        input: &[u8; G2_COMPRESSED],
-    ) -> Result<[u8; G2], AltBn128CompressionError> {
-        let mut result_buffer = [0; G2];
-        let result = unsafe {
-            crate::syscalls::sol_alt_bn128_compression(
-                ALT_BN128_G2_DECOMPRESS,
-                input as *const _ as *const u8,
-                input.len() as u64,
-                &mut result_buffer as *mut _ as *mut u8,
-            )
-        };
+  pub fn alt_bn128_g2_decompress(
+    input: &[u8; G2_COMPRESSED],
+  ) -> Result<[u8; G2], AltBn128CompressionError> {
+    let mut result_buffer = [0; G2];
+    let result = unsafe {
+      crate::syscalls::sol_alt_bn128_compression(
+        ALT_BN128_G2_DECOMPRESS,
+        input as *const _ as *const u8,
+        input.len() as u64,
+        &mut result_buffer as *mut _ as *mut u8,
+      )
+    };
 
-        match result {
-            0 => Ok(result_buffer),
-            error => Err(AltBn128CompressionError::from(error)),
-        }
+    match result {
+      0 => Ok(result_buffer),
+      error => Err(AltBn128CompressionError::from(error)),
     }
+  }
 }
 
 #[cfg(test)]
 mod tests {
 
-    use super::target_arch::convert_endianness;
+  use super::target_arch::convert_endianness;
 
-    use {
-        super::*,
-        ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate},
-        std::ops::Neg,
-        target_arch::{
-            alt_bn128_g1_compress, alt_bn128_g1_decompress, alt_bn128_g2_compress,
-            alt_bn128_g2_decompress,
-        },
-    };
-    type G1 = ark_bn254::g1::G1Affine;
-    type G2 = ark_bn254::g2::G2Affine;
-    use ark_ff::UniformRand;
-    use ark_std::test_rng;
+  use {
+    super::*,
+    ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate},
+    std::ops::Neg,
+    target_arch::{
+      alt_bn128_g1_compress, alt_bn128_g1_decompress, alt_bn128_g2_compress,
+      alt_bn128_g2_decompress,
+    },
+  };
+  type G1 = ark_bn254::g1::G1Affine;
+  type G2 = ark_bn254::g2::G2Affine;
+  use ark_ff::UniformRand;
+  use ark_std::test_rng;
 
-    #[test]
-    fn alt_bn128_g1_compression() {
-        let g1_be = [
-            45, 206, 255, 166, 152, 55, 128, 138, 79, 217, 145, 164, 25, 74, 120, 234, 234, 217,
-            68, 149, 162, 44, 133, 120, 184, 205, 12, 44, 175, 98, 168, 172, 20, 24, 216, 15, 209,
-            175, 106, 75, 147, 236, 90, 101, 123, 219, 245, 151, 209, 202, 218, 104, 148, 8, 32,
-            254, 243, 191, 218, 122, 42, 81, 193, 84,
-        ];
+  #[test]
+  fn alt_bn128_g1_compression() {
+    let g1_be = [
+      45, 206, 255, 166, 152, 55, 128, 138, 79, 217, 145, 164, 25, 74, 120, 234, 234, 217, 68, 149,
+      162, 44, 133, 120, 184, 205, 12, 44, 175, 98, 168, 172, 20, 24, 216, 15, 209, 175, 106, 75,
+      147, 236, 90, 101, 123, 219, 245, 151, 209, 202, 218, 104, 148, 8, 32, 254, 243, 191, 218,
+      122, 42, 81, 193, 84,
+    ];
 
-        let g1_le = convert_endianness::<32, 64>(&g1_be);
-        let g1: G1 =
-            G1::deserialize_with_mode(g1_le.as_slice(), Compress::No, Validate::No).unwrap();
+    let g1_le = convert_endianness::<32, 64>(&g1_be);
+    let g1: G1 = G1::deserialize_with_mode(g1_le.as_slice(), Compress::No, Validate::No).unwrap();
 
-        let g1_neg = g1.neg();
-        let mut g1_neg_be = [0u8; 64];
-        g1_neg
-            .x
-            .serialize_with_mode(&mut g1_neg_be[..32], Compress::No)
-            .unwrap();
-        g1_neg
-            .y
-            .serialize_with_mode(&mut g1_neg_be[32..64], Compress::No)
-            .unwrap();
-        let g1_neg_be: [u8; 64] = convert_endianness::<32, 64>(&g1_neg_be);
+    let g1_neg = g1.neg();
+    let mut g1_neg_be = [0u8; 64];
+    g1_neg
+      .x
+      .serialize_with_mode(&mut g1_neg_be[..32], Compress::No)
+      .unwrap();
+    g1_neg
+      .y
+      .serialize_with_mode(&mut g1_neg_be[32..64], Compress::No)
+      .unwrap();
+    let g1_neg_be: [u8; 64] = convert_endianness::<32, 64>(&g1_neg_be);
 
-        let points = [(g1, g1_be), (g1_neg, g1_neg_be)];
+    let points = [(g1, g1_be), (g1_neg, g1_neg_be)];
 
-        for (point, g1_be) in &points {
-            let mut compressed_ref = [0u8; 32];
-            G1::serialize_with_mode(point, compressed_ref.as_mut_slice(), Compress::Yes).unwrap();
-            let compressed_ref: [u8; 32] = convert_endianness::<32, 32>(&compressed_ref);
+    for (point, g1_be) in &points {
+      let mut compressed_ref = [0u8; 32];
+      G1::serialize_with_mode(point, compressed_ref.as_mut_slice(), Compress::Yes).unwrap();
+      let compressed_ref: [u8; 32] = convert_endianness::<32, 32>(&compressed_ref);
 
-            let decompressed = alt_bn128_g1_decompress(compressed_ref.as_slice()).unwrap();
+      let decompressed = alt_bn128_g1_decompress(compressed_ref.as_slice()).unwrap();
 
-            assert_eq!(
-                alt_bn128_g1_compress(&decompressed).unwrap(),
-                compressed_ref
-            );
-            assert_eq!(decompressed, *g1_be);
-        }
+      assert_eq!(
+        alt_bn128_g1_compress(&decompressed).unwrap(),
+        compressed_ref
+      );
+      assert_eq!(decompressed, *g1_be);
     }
+  }
 
-    #[test]
-    fn alt_bn128_g1_compress_loop() {
-        for _ in 0..1000 {
-            let mut rng = test_rng();
-            let mut g1_le = [0u8; 64];
-            let rnd_g1 = G1::rand(&mut rng);
+  #[test]
+  fn alt_bn128_g1_compress_loop() {
+    for _ in 0..1000 {
+      let mut rng = test_rng();
+      let mut g1_le = [0u8; 64];
+      let rnd_g1 = G1::rand(&mut rng);
 
-            rnd_g1
-                .x
-                .serialize_with_mode(&mut g1_le[..32], Compress::No)
-                .unwrap();
-            rnd_g1
-                .y
-                .serialize_with_mode(&mut g1_le[32..], Compress::No)
-                .unwrap();
-            let g1_le: [u8; 64] = g1_le.try_into().unwrap();
-            let g1_be = convert_endianness::<32, 64>(&g1_le.try_into().unwrap());
+      rnd_g1
+        .x
+        .serialize_with_mode(&mut g1_le[..32], Compress::No)
+        .unwrap();
+      rnd_g1
+        .y
+        .serialize_with_mode(&mut g1_le[32..], Compress::No)
+        .unwrap();
+      let g1_le: [u8; 64] = g1_le.try_into().unwrap();
+      let g1_be = convert_endianness::<32, 64>(&g1_le.try_into().unwrap());
 
-            let g1: G1 =
-                G1::deserialize_with_mode(g1_le.as_slice(), Compress::No, Validate::No).unwrap();
+      let g1: G1 = G1::deserialize_with_mode(g1_le.as_slice(), Compress::No, Validate::No).unwrap();
 
-            let g1_neg = g1.neg();
-            let mut g1_neg_be = [0u8; 64];
-            g1_neg
-                .x
-                .serialize_with_mode(&mut g1_neg_be[..32], Compress::No)
-                .unwrap();
-            g1_neg
-                .y
-                .serialize_with_mode(&mut g1_neg_be[32..64], Compress::No)
-                .unwrap();
-            let g1_neg_be: [u8; 64] = convert_endianness::<32, 64>(&g1_neg_be);
+      let g1_neg = g1.neg();
+      let mut g1_neg_be = [0u8; 64];
+      g1_neg
+        .x
+        .serialize_with_mode(&mut g1_neg_be[..32], Compress::No)
+        .unwrap();
+      g1_neg
+        .y
+        .serialize_with_mode(&mut g1_neg_be[32..64], Compress::No)
+        .unwrap();
+      let g1_neg_be: [u8; 64] = convert_endianness::<32, 64>(&g1_neg_be);
 
-            let points = [(g1, g1_be), (g1_neg, g1_neg_be)];
+      let points = [(g1, g1_be), (g1_neg, g1_neg_be)];
 
-            for (point, g1_be) in &points {
-                let mut compressed_ref = [0u8; 32];
-                G1::serialize_with_mode(point, compressed_ref.as_mut_slice(), Compress::Yes)
-                    .unwrap();
-                let compressed_ref: [u8; 32] = convert_endianness::<32, 32>(&compressed_ref);
+      for (point, g1_be) in &points {
+        let mut compressed_ref = [0u8; 32];
+        G1::serialize_with_mode(point, compressed_ref.as_mut_slice(), Compress::Yes).unwrap();
+        let compressed_ref: [u8; 32] = convert_endianness::<32, 32>(&compressed_ref);
 
-                let decompressed = alt_bn128_g1_decompress(compressed_ref.as_slice()).unwrap();
+        let decompressed = alt_bn128_g1_decompress(compressed_ref.as_slice()).unwrap();
 
-                assert_eq!(
-                    alt_bn128_g1_compress(&decompressed).unwrap(),
-                    compressed_ref
-                );
-                assert_eq!(decompressed[32], g1_be[32]);
+        assert_eq!(
+          alt_bn128_g1_compress(&decompressed).unwrap(),
+          compressed_ref
+        );
+        assert_eq!(decompressed[32], g1_be[32]);
 
-                assert_eq!(decompressed, *g1_be);
-            }
-        }
+        assert_eq!(decompressed, *g1_be);
+      }
     }
+  }
 
-    #[test]
-    fn alt_bn128_g2_compression() {
-        let g2_be = [
-            40, 57, 233, 205, 180, 46, 35, 111, 215, 5, 23, 93, 12, 71, 118, 225, 7, 46, 247, 147,
-            47, 130, 106, 189, 184, 80, 146, 103, 141, 52, 242, 25, 0, 203, 124, 176, 110, 34, 151,
-            212, 66, 180, 238, 151, 236, 189, 133, 209, 17, 137, 205, 183, 168, 196, 92, 159, 75,
-            174, 81, 168, 18, 86, 176, 56, 16, 26, 210, 20, 18, 81, 122, 142, 104, 62, 251, 169,
-            98, 141, 21, 253, 50, 130, 182, 15, 33, 109, 228, 31, 79, 183, 88, 147, 174, 108, 4,
-            22, 14, 129, 168, 6, 80, 246, 254, 100, 218, 131, 94, 49, 247, 211, 3, 245, 22, 200,
-            177, 91, 60, 144, 147, 174, 90, 17, 19, 189, 62, 147, 152, 18,
-        ];
-        let g2_le = convert_endianness::<64, 128>(&g2_be);
-        let g2: G2 =
-            G2::deserialize_with_mode(g2_le.as_slice(), Compress::No, Validate::No).unwrap();
+  #[test]
+  fn alt_bn128_g2_compression() {
+    let g2_be = [
+      40, 57, 233, 205, 180, 46, 35, 111, 215, 5, 23, 93, 12, 71, 118, 225, 7, 46, 247, 147, 47,
+      130, 106, 189, 184, 80, 146, 103, 141, 52, 242, 25, 0, 203, 124, 176, 110, 34, 151, 212, 66,
+      180, 238, 151, 236, 189, 133, 209, 17, 137, 205, 183, 168, 196, 92, 159, 75, 174, 81, 168,
+      18, 86, 176, 56, 16, 26, 210, 20, 18, 81, 122, 142, 104, 62, 251, 169, 98, 141, 21, 253, 50,
+      130, 182, 15, 33, 109, 228, 31, 79, 183, 88, 147, 174, 108, 4, 22, 14, 129, 168, 6, 80, 246,
+      254, 100, 218, 131, 94, 49, 247, 211, 3, 245, 22, 200, 177, 91, 60, 144, 147, 174, 90, 17,
+      19, 189, 62, 147, 152, 18,
+    ];
+    let g2_le = convert_endianness::<64, 128>(&g2_be);
+    let g2: G2 = G2::deserialize_with_mode(g2_le.as_slice(), Compress::No, Validate::No).unwrap();
 
-        let g2_neg = g2.neg();
-        let mut g2_neg_be = [0u8; 128];
-        g2_neg
-            .x
-            .serialize_with_mode(&mut g2_neg_be[..64], Compress::No)
-            .unwrap();
-        g2_neg
-            .y
-            .serialize_with_mode(&mut g2_neg_be[64..128], Compress::No)
-            .unwrap();
-        let g2_neg_be: [u8; 128] = convert_endianness::<64, 128>(&g2_neg_be);
+    let g2_neg = g2.neg();
+    let mut g2_neg_be = [0u8; 128];
+    g2_neg
+      .x
+      .serialize_with_mode(&mut g2_neg_be[..64], Compress::No)
+      .unwrap();
+    g2_neg
+      .y
+      .serialize_with_mode(&mut g2_neg_be[64..128], Compress::No)
+      .unwrap();
+    let g2_neg_be: [u8; 128] = convert_endianness::<64, 128>(&g2_neg_be);
 
-        let points = [(g2, g2_be), (g2_neg, g2_neg_be)];
+    let points = [(g2, g2_be), (g2_neg, g2_neg_be)];
 
-        for (point, g2_be) in &points {
-            let mut compressed_ref = [0u8; 64];
-            G2::serialize_with_mode(point, compressed_ref.as_mut_slice(), Compress::Yes).unwrap();
-            let compressed_ref: [u8; 64] = convert_endianness::<64, 64>(&compressed_ref);
+    for (point, g2_be) in &points {
+      let mut compressed_ref = [0u8; 64];
+      G2::serialize_with_mode(point, compressed_ref.as_mut_slice(), Compress::Yes).unwrap();
+      let compressed_ref: [u8; 64] = convert_endianness::<64, 64>(&compressed_ref);
 
-            let decompressed = alt_bn128_g2_decompress(compressed_ref.as_slice()).unwrap();
+      let decompressed = alt_bn128_g2_decompress(compressed_ref.as_slice()).unwrap();
 
-            assert_eq!(
-                alt_bn128_g2_compress(&decompressed).unwrap(),
-                compressed_ref
-            );
-            assert_eq!(decompressed, *g2_be);
-        }
+      assert_eq!(
+        alt_bn128_g2_compress(&decompressed).unwrap(),
+        compressed_ref
+      );
+      assert_eq!(decompressed, *g2_be);
     }
+  }
 
-    #[test]
-    fn alt_bn128_g2_compress_loop() {
-        for _ in 0..100 {
-            let mut rng = test_rng();
-            let mut g2_le = [0u8; 128];
-            let rnd_g2 = G2::rand(&mut rng);
+  #[test]
+  fn alt_bn128_g2_compress_loop() {
+    for _ in 0..100 {
+      let mut rng = test_rng();
+      let mut g2_le = [0u8; 128];
+      let rnd_g2 = G2::rand(&mut rng);
 
-            rnd_g2
-                .x
-                .serialize_with_mode(&mut g2_le[..64], Compress::No)
-                .unwrap();
-            rnd_g2
-                .y
-                .serialize_with_mode(&mut g2_le[64..], Compress::No)
-                .unwrap();
-            let g2_le: [u8; 128] = g2_le.try_into().unwrap();
-            let g2_be = convert_endianness::<64, 128>(&g2_le.try_into().unwrap());
+      rnd_g2
+        .x
+        .serialize_with_mode(&mut g2_le[..64], Compress::No)
+        .unwrap();
+      rnd_g2
+        .y
+        .serialize_with_mode(&mut g2_le[64..], Compress::No)
+        .unwrap();
+      let g2_le: [u8; 128] = g2_le.try_into().unwrap();
+      let g2_be = convert_endianness::<64, 128>(&g2_le.try_into().unwrap());
 
-            let g2: G2 =
-                G2::deserialize_with_mode(g2_le.as_slice(), Compress::No, Validate::No).unwrap();
+      let g2: G2 = G2::deserialize_with_mode(g2_le.as_slice(), Compress::No, Validate::No).unwrap();
 
-            let g2_neg = g2.neg();
-            let mut g2_neg_be = [0u8; 128];
-            g2_neg
-                .x
-                .serialize_with_mode(&mut g2_neg_be[..64], Compress::No)
-                .unwrap();
-            g2_neg
-                .y
-                .serialize_with_mode(&mut g2_neg_be[64..128], Compress::No)
-                .unwrap();
-            let g2_neg_be: [u8; 128] = convert_endianness::<64, 128>(&g2_neg_be);
+      let g2_neg = g2.neg();
+      let mut g2_neg_be = [0u8; 128];
+      g2_neg
+        .x
+        .serialize_with_mode(&mut g2_neg_be[..64], Compress::No)
+        .unwrap();
+      g2_neg
+        .y
+        .serialize_with_mode(&mut g2_neg_be[64..128], Compress::No)
+        .unwrap();
+      let g2_neg_be: [u8; 128] = convert_endianness::<64, 128>(&g2_neg_be);
 
-            let points = [(g2, g2_be), (g2_neg, g2_neg_be)];
+      let points = [(g2, g2_be), (g2_neg, g2_neg_be)];
 
-            for (point, g2_be) in &points {
-                let mut compressed_ref = [0u8; 64];
-                G2::serialize_with_mode(point, compressed_ref.as_mut_slice(), Compress::Yes)
-                    .unwrap();
-                let compressed_ref: [u8; 64] = convert_endianness::<64, 64>(&compressed_ref);
+      for (point, g2_be) in &points {
+        let mut compressed_ref = [0u8; 64];
+        G2::serialize_with_mode(point, compressed_ref.as_mut_slice(), Compress::Yes).unwrap();
+        let compressed_ref: [u8; 64] = convert_endianness::<64, 64>(&compressed_ref);
 
-                let decompressed = alt_bn128_g2_decompress(compressed_ref.as_slice()).unwrap();
+        let decompressed = alt_bn128_g2_decompress(compressed_ref.as_slice()).unwrap();
 
-                assert_eq!(
-                    alt_bn128_g2_compress(&decompressed).unwrap(),
-                    compressed_ref
-                );
-                assert_eq!(decompressed, *g2_be);
-            }
-        }
+        assert_eq!(
+          alt_bn128_g2_compress(&decompressed).unwrap(),
+          compressed_ref
+        );
+        assert_eq!(decompressed, *g2_be);
+      }
     }
+  }
 
-    #[test]
-    fn alt_bn128_compression_g1_point_of_infitity() {
-        let g1_bytes = vec![0u8; 64];
-        let g1_compressed = alt_bn128_g1_compress(&g1_bytes).unwrap();
-        let g1_decompressed = alt_bn128_g1_decompress(&g1_compressed).unwrap();
-        assert_eq!(g1_bytes, g1_decompressed);
-    }
+  #[test]
+  fn alt_bn128_compression_g1_point_of_infitity() {
+    let g1_bytes = vec![0u8; 64];
+    let g1_compressed = alt_bn128_g1_compress(&g1_bytes).unwrap();
+    let g1_decompressed = alt_bn128_g1_decompress(&g1_compressed).unwrap();
+    assert_eq!(g1_bytes, g1_decompressed);
+  }
 
-    #[test]
-    fn alt_bn128_compression_g2_point_of_infitity() {
-        let g1_bytes = vec![0u8; 128];
-        let g1_compressed = alt_bn128_g2_compress(&g1_bytes).unwrap();
-        let g1_decompressed = alt_bn128_g2_decompress(&g1_compressed).unwrap();
-        assert_eq!(g1_bytes, g1_decompressed);
-    }
-    #[test]
-    fn alt_bn128_compression_pairing_test_input() {
-        use serde::Deserialize;
+  #[test]
+  fn alt_bn128_compression_g2_point_of_infitity() {
+    let g1_bytes = vec![0u8; 128];
+    let g1_compressed = alt_bn128_g2_compress(&g1_bytes).unwrap();
+    let g1_decompressed = alt_bn128_g2_decompress(&g1_compressed).unwrap();
+    assert_eq!(g1_bytes, g1_decompressed);
+  }
+  #[test]
+  fn alt_bn128_compression_pairing_test_input() {
+    use serde::Deserialize;
 
-        let test_data = r#"[
+    let test_data = r#"[
         {
             "Input": "1c76476f4def4bb94541d57ebba1193381ffa7aa76ada664dd31c16024c43f593034dd2920f673e204fee2811c678745fc819b55d3e9d294e45c9b03a76aef41209dd15ebff5d46c4bd888e51a93cf99a7329636c63514396b4a452003a35bf704bf11ca01483bfa8b34b43561848d28905960114c8ac04049af4b6315a416782bb8324af6cfc93537a2ad1a445cfd0ca2a71acd7ac41fadbf933c2a51be344d120a2a4cf30c1bf9845f20c6fe39e07ea2cce61f0c9bb048165fe5e4de877550111e129f1cf1097710d41c4ac70fcdfa5ba2023c6ff1cbeac322de49d1b6df7c2032c61a830e3c17286de9462bf242fca2883585b93870a73853face6a6bf411198e9393920d483a7260bfb731fb5d25f1aa493335a9e71297e485b7aef312c21800deef121f1e76426a00665e5c4479674322d4f75edadd46debd5cd992f6ed090689d0585ff075ec9e99ad690c3395bc4b313370b38ef355acdadcd122975b12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa",
             "Expected": "0000000000000000000000000000000000000000000000000000000000000001",
@@ -572,22 +566,22 @@ mod tests {
         }
         ]"#;
 
-        #[derive(Deserialize)]
-        #[serde(rename_all = "PascalCase")]
-        struct TestCase {
-            input: String,
-        }
-
-        let test_cases: Vec<TestCase> = serde_json::from_str(test_data).unwrap();
-
-        test_cases.iter().for_each(|test| {
-            let input = array_bytes::hex2bytes_unchecked(&test.input);
-            let g1 = input[0..64].to_vec();
-            let g1_compressed = alt_bn128_g1_compress(&g1).unwrap();
-            assert_eq!(g1, alt_bn128_g1_decompress(&g1_compressed).unwrap());
-            let g2 = input[64..192].to_vec();
-            let g2_compressed = alt_bn128_g2_compress(&g2).unwrap();
-            assert_eq!(g2, alt_bn128_g2_decompress(&g2_compressed).unwrap());
-        });
+    #[derive(Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    struct TestCase {
+      input: String,
     }
+
+    let test_cases: Vec<TestCase> = serde_json::from_str(test_data).unwrap();
+
+    test_cases.iter().for_each(|test| {
+      let input = array_bytes::hex2bytes_unchecked(&test.input);
+      let g1 = input[0..64].to_vec();
+      let g1_compressed = alt_bn128_g1_compress(&g1).unwrap();
+      assert_eq!(g1, alt_bn128_g1_decompress(&g1_compressed).unwrap());
+      let g2 = input[64..192].to_vec();
+      let g2_compressed = alt_bn128_g2_compress(&g2).unwrap();
+      assert_eq!(g2, alt_bn128_g2_decompress(&g2_compressed).unwrap());
+    });
+  }
 }
